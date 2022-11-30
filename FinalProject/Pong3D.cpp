@@ -2,6 +2,7 @@
 #include <thread>
 #include <string>
 #include <iostream>
+#include <vector>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -21,7 +22,18 @@ bool isFirstFrame = true;
 struct Vertex
 {
     glm::vec4 pos;
-    float r, g, b, a;
+    glm::vec4 col;
+
+    Vertex()
+    {
+        memset(this, 0x0, sizeof(struct Vertex));
+    }
+
+    Vertex(glm::vec4 position, glm::vec4 color)
+    {
+        pos = position;
+        col = color;
+    }
 };
 
 struct Transform
@@ -37,10 +49,8 @@ class Camera {
     
     //시야각 45도 / 종횡비 4:3 / near plane 0.1f / far plane 100.0f
     glm::mat4 Projection = glm::perspective(glm::radians(45.0f), (float)800 / (float)600, 0.1f, 100.0f);
-
-    
+        
     Transform transform;
-
 
     void Init()
     {
@@ -77,11 +87,41 @@ class PlayerPad {
     }
 };
 
-class Wall {
+class Stage {
+public:
     Transform transform;
 
+    vector<Vertex> VB;
+
+    Stage()
+    {
+        Init();
+    }
+    ~Stage()
+    {
+        Init();
+    }
     void Init()
     {
+        VB.clear();
+
+        //정면
+        VB.push_back(Vertex(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f))); //pos , rgb
+        VB.push_back(Vertex(glm::vec4(-1.0f, 1.0f, 1.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f))); //pos , rgb
+        VB.push_back(Vertex(glm::vec4(1.0f, -1.0f, 1.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f))); //pos , rgb
+
+        VB.push_back(Vertex(glm::vec4(-1.0f, 1.0f, 1.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f))); //pos , rgb
+        VB.push_back(Vertex(glm::vec4(-1.0f,-1.0f, 1.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f))); //pos , rgb
+        VB.push_back(Vertex(glm::vec4( 1.0f,-1.0f, 1.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f))); //pos , rgb
+
+        //우측면
+        VB.push_back(Vertex(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f))); //pos , rgb
+        VB.push_back(Vertex(glm::vec4(1.0f, -1.0f, 1.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f))); //pos , rgb
+        VB.push_back(Vertex(glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f))); //pos , rgb
+
+        VB.push_back(Vertex(glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f))); //pos , rgb
+        VB.push_back(Vertex(glm::vec4(1.0f, -1.0f, 1.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f))); //pos , rgb
+        VB.push_back(Vertex(glm::vec4(1.0f, -1.0f, 1.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f))); //pos , rgb
 
     }
     void Update()
@@ -89,8 +129,19 @@ class Wall {
 
     }
     void Render()
-    {
+    {        
+        //선두께
+        glLineWidth(1.0f);
 
+        glBegin(GL_TRIANGLES);
+
+        for (int i = 0; i < VB.size(); i++)
+        {
+            glColor4f(VB[i].col.r, VB[i].col.g, VB[i].col.b, VB[i].col.a);
+            glVertex4f(VB[i].pos.x, VB[i].pos.y, VB[i].pos.z, VB[i].pos.w);
+        }
+
+        glEnd();
     }
 };
 
@@ -119,6 +170,9 @@ Vertex circle[360];             // static mesh
 Vertex transformedCircle[360];  // 화면에 그려질 원
 
 Transform transform;  //world 행렬이 될 transform
+
+Stage *g_stage;
+Camera *g_camera
 
 //<문제>////////전역변수 쓰는곳////////////////////////////////////////////////////////////
 
@@ -159,43 +213,7 @@ void Init()
 
     startRenderTimePoint = chrono::system_clock::now();
 
-
-    //object생성부
-     /// Star(오망성) 생성
-    int i = 0;
-    for (float theta = 0; theta < 360; theta += 72)
-    {
-
-        star[i].pos.x = -glm::sin(glm::radians(theta)) * 0.5f;
-        star[i].pos.y = glm::cos(glm::radians(theta)) * 0.5f;
-        star[i].pos.z = 1.0f;
-
-        star[i].r = 0.3f;
-        star[i].g = 0.0f;
-        star[i].b = theta / 360.0f;
-        star[i].a = 0.7f;
-
-
-        transformedStar[i] = star[i];
-
-        i++;
-    }
-
-    // 원 생성
-    for (int theta = 0; theta < 360; theta++)
-    {
-        circle[theta].pos.x = -glm::sin(glm::radians((float)theta)) * 0.5;
-        circle[theta].pos.y = glm::cos(glm::radians((float)theta)) * 0.5;
-        circle[theta].pos.z = 1.0f;
-
-        circle[theta].r = 0.3f;
-        circle[theta].g = 0.0f;
-        circle[theta].b = (float)theta / 360.0f;
-        circle[theta].a = 0.7f;
-
-        transformedCircle[theta] = circle[theta];
-    }
-
+      
 
     //트랜스폼 초기화 (기본형 제공)
     transform.translate = glm::mat4(
@@ -217,7 +235,7 @@ void Init()
         0, 0, 0, 1
     );
 
-
+    g_stage = new Stage();
 }
 
 void Release()
@@ -227,92 +245,45 @@ void Release()
 }
 void Update()
 {
-    while (!glfwWindowShouldClose(window))
-    {
-        //Update로직
-        //<문제>//////////////////////////////////////////////////////////////////////////////////
-
-        //1. translate 를 프레임당 오른쪽으로 0.001씩 누적시켜서 물체를 이동해보세요.
-        //2. Rotation 을 프레임당 1도씩 누적시켜서 물체를 회전시켜보세요.
-        //3. Scale은 초당 0.01씩 최대 1.3배까지 늘어났다가 0.7배까지 줄어들도록 만드시오 (반복)
-        //   (1.3배 이상이 되면 줄어들고 0.7배 이하가 되면 다시 늘어나게 만드시오)
+   
 
 
-        //////////////////////////////////////////////////////////////////////////////////////////
+        
 
-        for (int i = 0; i < 360; i++)
-        {
-            transformedCircle[i].pos = transform.translate * transform.rotation * transform.scale * circle[i].pos;
-        }
+        
 
-        for (int i = 0; i < 5; i++)
-        {
-            transformedStar[i].pos = transform.translate * transform.rotation * transform.scale * star[i].pos;
-        }
+    
+}
+void Render()
+{
+    //색 초기화
+    glClearColor(.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
 
+    g_stage->Render();
 
-
-        //색 초기화
-        glClearColor(.0f, 0.0f, 0.0f, 0.1f);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        //선두께
-        glLineWidth(7.0f);
-        //오망성 그리기
-        glBegin(GL_LINE_STRIP);
-
-        int a = 0;
-        glColor4f(transformedStar[a].r, transformedStar[a].g, transformedStar[a].b, transformedStar[a].a);
-        glVertex3f(transformedStar[a].pos.x, transformedStar[a].pos.y, 0.0f);
-        a = 3;
-        glColor4f(transformedStar[a].r, transformedStar[a].g, transformedStar[a].b, transformedStar[a].a);
-        glVertex3f(transformedStar[a].pos.x, transformedStar[a].pos.y, 0.0f);
-        a = 1;
-        glColor4f(transformedStar[a].r, transformedStar[a].g, transformedStar[a].b, transformedStar[a].a);
-        glVertex3f(transformedStar[a].pos.x, transformedStar[a].pos.y, 0.0f);
-        a = 4;
-        glColor4f(transformedStar[a].r, transformedStar[a].g, transformedStar[a].b, transformedStar[a].a);
-        glVertex3f(transformedStar[a].pos.x, transformedStar[a].pos.y, 0.0f);
-        a = 2;
-        glColor4f(transformedStar[a].r, transformedStar[a].g, transformedStar[a].b, transformedStar[a].a);
-        glVertex3f(transformedStar[a].pos.x, transformedStar[a].pos.y, 0.0f);
-
-        a = 0;
-        glColor4f(transformedStar[a].r, transformedStar[a].g, transformedStar[a].b, transformedStar[a].a);
-        glVertex3f(transformedStar[a].pos.x, transformedStar[a].pos.y, 0.0f);
-        glEnd();
-
-        //원그리기
-        glBegin(GL_LINE_STRIP);
-        for (int theta = 0; theta < 360; theta++)
-        {
-            glColor4f(transformedCircle[theta].r, transformedCircle[theta].g, transformedCircle[theta].b, transformedCircle[theta].a);
-            glVertex3f(transformedCircle[theta].pos.x, transformedCircle[theta].pos.y, 0.0f);
-        }
-        glEnd();
+    //vector<Vertex> VB;
+    //VB.clear();
+    //VB.push_back(Vertex(glm::vec4( 1.0f, 1.0f, 1.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f))); //pos , rgb
+    //VB.push_back(Vertex(glm::vec4(-1.0f, 1.0f, 1.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f))); //pos , rgb
+    //VB.push_back(Vertex(glm::vec4( 1.0f,-1.0f, 1.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f))); //pos , rgb
 
 
+    ////선두께
+    //glLineWidth(1.0f);
 
-        //화면 스왑
-        glfwSwapBuffers(window);
-        glfwPollEvents();
+    //glBegin(GL_TRIANGLES);
 
-        //렌더시간 측정
-        renderDuration = chrono::system_clock::now() - startRenderTimePoint;
-        startRenderTimePoint = chrono::system_clock::now();
+    //for (int i = 0; i < VB.size(); i++)
+    //{
+    //    glColor4f(VB[i].col.r, VB[i].col.g, VB[i].col.b, VB[i].col.a);
+    //    glVertex4f(VB[i].pos.x, VB[i].pos.y, VB[i].pos.z, VB[i].pos.w);
+    //}
 
-        float fps = 1.0 / renderDuration.count();
-        if (isFirstFrame == true)
-        {
-            isFirstFrame = false;
-            continue;
-        }
-        if (renderDuration.count() < (1.0f / 60.0f))
-            this_thread::sleep_for(chrono::milliseconds((int)(((1.0f / 60.0f) - renderDuration.count()) * 1000)));
-        string fps_s = "FPS : " + to_string(fps);
-        cout << fps_s << endl;
 
-    }
+    //glEnd();
+    
+    
 }
 
 static void error_callback(int error, const char* description)
@@ -326,12 +297,36 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 }
 
 int main(void)
-{
-
-    
+{  
 
     Init();
-    Update();
+
+    while (!glfwWindowShouldClose(window))  //게임루프
+    {
+        Update();
+        Render();
+
+        //화면 스왑
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+
+        //렌더시간 측정
+        renderDuration = chrono::system_clock::now() - startRenderTimePoint;
+        startRenderTimePoint = chrono::system_clock::now();
+
+        double fps = 1.0 / renderDuration.count();
+        if (isFirstFrame == true)
+        {        
+            isFirstFrame = false;
+            continue;
+        }
+        if (renderDuration.count() < (1.0f / 60.0f))
+            this_thread::sleep_for(chrono::milliseconds((int)(((1.0f / 60.0f) - renderDuration.count()) * 1000)));
+        string fps_s = "FPS : " + to_string(fps);
+        cout << fps_s << endl;
+
+    }
+
     Release();
 
     exit(EXIT_SUCCESS);
